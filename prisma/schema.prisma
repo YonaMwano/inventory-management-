@@ -1,0 +1,327 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  INVENTORY_MANAGER
+  SALES_STAFF
+  PURCHASING_OFFICER
+  ACCOUNTANT
+}
+
+enum StockMovementType {
+  STOCK_IN
+  STOCK_OUT
+  TRANSFER
+  ADJUSTMENT
+  RETURN
+  DAMAGE
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PARTIAL
+  FULFILLED
+  CANCELLED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          Role           @default(SALES_STAFF)
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  stockMovements StockMovement[]
+  salesOrders    SalesOrder[]
+  purchaseOrders PurchaseOrder[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+
+  @@map("users")
+}
+
+model Warehouse {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  inventoryItems InventoryItem[]
+  stockMovementsFrom StockMovement[] @relation("FromWarehouse")
+  stockMovementsTo   StockMovement[] @relation("ToWarehouse")
+  salesOrders        SalesOrder[]
+
+  @@map("warehouses")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@map("categories")
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  leadTimeDays Int     @default(7)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  sku           String   @unique
+  name          String
+  description   String?
+  barcode       String?
+  categoryId    String?
+  supplierId    String?
+  unit          String   @default("pcs")
+  costPrice     Decimal  @db.Decimal(12, 2)
+  sellingPrice  Decimal  @db.Decimal(12, 2)
+  reorderLevel  Int      @default(10)
+  isActive      Boolean  @default(true)
+  imageUrl      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  category       Category?       @relation(fields: [categoryId], references: [id])
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  inventoryItems InventoryItem[]
+  stockMovements StockMovement[]
+  salesOrderItems SalesOrderItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+
+  @@index([sku])
+  @@index([name])
+  @@map("products")
+}
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  productId   String
+  warehouseId String
+  quantity    Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, warehouseId])
+  @@map("inventory_items")
+}
+
+model StockMovement {
+  id              String            @id @default(cuid())
+  productId       String
+  type            StockMovementType
+  quantity        Int
+  fromWarehouseId String?
+  toWarehouseId   String?
+  reference       String?           // e.g. SO-001, PO-001, ADJ-001
+  reason          String?
+  notes           String?
+  userId          String
+  createdAt       DateTime          @default(now())
+
+  product       Product    @relation(fields: [productId], references: [id])
+  fromWarehouse Warehouse? @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse? @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
+  user          User       @relation(fields: [userId], references: [id])
+
+  @@index([productId])
+  @@index([createdAt])
+  @@index([type])
+  @@map("stock_movements")
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  salesOrders SalesOrder[]
+
+  @@map("customers")
+}
+
+model SalesOrder {
+  id                String            @id @default(cuid())
+  orderNumber       String            @unique
+  customerId        String?
+  warehouseId       String
+  orderDate         DateTime          @default(now())
+  status            OrderStatus       @default(DRAFT)
+  paymentStatus     PaymentStatus     @default(UNPAID)
+  fulfillmentStatus FulfillmentStatus @default(PENDING)
+  subtotal          Decimal           @db.Decimal(12, 2)
+  taxAmount         Decimal           @db.Decimal(12, 2) @default(0)
+  discountAmount    Decimal           @db.Decimal(12, 2) @default(0)
+  total             Decimal           @db.Decimal(12, 2)
+  notes             String?
+  createdById       String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  customer  Customer?        @relation(fields: [customerId], references: [id])
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  createdBy User             @relation(fields: [createdById], references: [id])
+  items     SalesOrderItem[]
+
+  @@index([orderNumber])
+  @@index([orderDate])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id           String  @id @default(cuid())
+  salesOrderId String
+  productId    String
+  quantity     Int
+  unitPrice    Decimal @db.Decimal(12, 2)
+  discount     Decimal @db.Decimal(12, 2) @default(0)
+  total        Decimal @db.Decimal(12, 2)
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id])
+
+  @@map("sales_order_items")
+}
+
+model PurchaseOrder {
+  id            String      @id @default(cuid())
+  poNumber      String      @unique
+  supplierId    String
+  orderDate     DateTime    @default(now())
+  expectedDate  DateTime?
+  status        OrderStatus @default(DRAFT)
+  subtotal      Decimal     @db.Decimal(12, 2)
+  taxAmount     Decimal     @db.Decimal(12, 2) @default(0)
+  total         Decimal     @db.Decimal(12, 2)
+  notes         String?
+  createdById   String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  supplier  Supplier            @relation(fields: [supplierId], references: [id])
+  createdBy User                @relation(fields: [createdById], references: [id])
+  items     PurchaseOrderItem[]
+
+  @@index([poNumber])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String  @id @default(cuid())
+  purchaseOrderId String
+  productId       String
+  quantity        Int
+  receivedQty     Int     @default(0)
+  unitCost        Decimal @db.Decimal(12, 2)
+  total           Decimal @db.Decimal(12, 2)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entity     String
+  entityId   String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info") // info, warning, danger, success
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model CompanySettings {
+  id            String   @id @default(cuid())
+  companyName   String
+  address       String?
+  phone         String?
+  email         String?
+  taxRate       Decimal  @db.Decimal(5, 2) @default(0)
+  currency      String   @default("USD")
+  logoUrl       String?
+  updatedAt     DateTime @updatedAt
+
+  @@map("company_settings")
+}

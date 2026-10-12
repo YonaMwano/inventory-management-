@@ -1,0 +1,19 @@
+# Inventory Management System — Runtime requirements
+# (Node.js project: install with npm, not pip)
+#
+# Node.js: 18.x or 20.x (Vercel default is fine)
+# Package manager: npm
+#
+# Install all dependencies:
+#   npm install
+#
+# Required environment variables (set in Vercel dashboard):
+#   DATABASE_URL=postgresql://...neon.tech/neondb?sslmode=require
+#
+# Optional:
+#   NEXT_PUBLIC_APP_NAME=Inventory Management System
+#
+# Database: Neon PostgreSQL — run prisma/migrations/0001_init.sql once
+#
+# See README.md for full setup and deploy steps.
+# See package.json for the actual dependency list.

@@ -25,23 +25,17 @@ export async function createPurchaseOrderAction(
   if (isNaN(unitCost) || unitCost < 0) return { error: "Invalid unit cost" };
 
   try {
-    const wh = await query<{ id: string }>(
-      `SELECT id FROM warehouses WHERE "isActive" = true ORDER BY "createdAt" ASC LIMIT 1`
-    );
-    const warehouseId = wh.rows[0]?.id;
-    if (!warehouseId) return { error: "No warehouse found. Seed database first." };
-
     const total = unitCost * quantity;
-    const orderNumber = generateOrderNumber("PO");
+    const poNumber = generateOrderNumber("PO");
     const orderId = createId();
     const itemId = createId();
 
     await query(
       `INSERT INTO purchase_orders (
-        id, "orderNumber", "supplierId", "warehouseId", "orderDate",
-        status, subtotal, "taxAmount", "shippingCost", total, "createdById", "createdAt", "updatedAt"
-      ) VALUES ($1,$2,$3,$4,NOW(),'ORDERED',$5,0,0,$5,$6,NOW(),NOW())`,
-      [orderId, orderNumber, supplierId, warehouseId, total, session.id]
+        id, "poNumber", "supplierId", "orderDate",
+        status, subtotal, "taxAmount", total, "createdById", "createdAt", "updatedAt"
+      ) VALUES ($1,$2,$3,NOW(),'CONFIRMED',$4,0,$4,$5,NOW(),NOW())`,
+      [orderId, poNumber, supplierId, total, session.id]
     );
 
     await query(
@@ -51,10 +45,11 @@ export async function createPurchaseOrderAction(
     );
 
     revalidatePath("/purchasing");
-    return { success: `PO ${orderNumber} created` };
+    return { success: `PO ${poNumber} created` };
   } catch (e) {
-    console.error(e);
-    return { error: "Failed to create purchase order" };
+    console.error("createPO:", e);
+    const msg = e instanceof Error ? e.message : "Failed to create purchase order";
+    return { error: msg };
   }
 }
 
@@ -71,30 +66,32 @@ export async function receivePurchaseOrderAction(
   try {
     const orderRes = await query<{
       id: string;
-      orderNumber: string;
-      warehouseId: string;
+      poNumber: string;
       status: string;
-    }>(`SELECT id, "orderNumber", "warehouseId", status FROM purchase_orders WHERE id = $1`, [
-      orderId,
-    ]);
+    }>(`SELECT id, "poNumber", status FROM purchase_orders WHERE id = $1`, [orderId]);
     const order = orderRes.rows[0];
     if (!order) return { error: "Order not found" };
     if (order.status === "RECEIVED") return { error: "Already received" };
+
+    const wh = await query<{ id: string }>(
+      `SELECT id FROM warehouses WHERE "isActive" = true ORDER BY "createdAt" ASC LIMIT 1`
+    );
+    const warehouseId = wh.rows[0]?.id;
+    if (!warehouseId) return { error: "No warehouse found" };
 
     const items = await query<{
       id: string;
       productId: string;
       quantity: number;
-      unitCost: string;
     }>(
-      `SELECT id, "productId", quantity, "unitCost" FROM purchase_order_items WHERE "purchaseOrderId" = $1`,
+      `SELECT id, "productId", quantity FROM purchase_order_items WHERE "purchaseOrderId" = $1`,
       [orderId]
     );
 
     for (const item of items.rows) {
       const inv = await query<{ id: string }>(
         `SELECT id FROM inventory_items WHERE "productId" = $1 AND "warehouseId" = $2`,
-        [item.productId, order.warehouseId]
+        [item.productId, warehouseId]
       );
       if (inv.rows[0]) {
         await query(
@@ -105,7 +102,7 @@ export async function receivePurchaseOrderAction(
         await query(
           `INSERT INTO inventory_items (id, "productId", "warehouseId", quantity, "updatedAt")
            VALUES ($1,$2,$3,$4,NOW())`,
-          [createId(), item.productId, order.warehouseId, item.quantity]
+          [createId(), item.productId, warehouseId, item.quantity]
         );
       }
 
@@ -117,12 +114,12 @@ export async function receivePurchaseOrderAction(
       await query(
         `INSERT INTO stock_movements (id, "productId", type, quantity, "toWarehouseId", reference, reason, "userId", "createdAt")
          VALUES ($1,$2,'STOCK_IN',$3,$4,$5,'PO receive',$6,NOW())`,
-        [createId(), item.productId, item.quantity, order.warehouseId, order.orderNumber, session.id]
+        [createId(), item.productId, item.quantity, warehouseId, order.poNumber, session.id]
       );
     }
 
     await query(
-      `UPDATE purchase_orders SET status = 'RECEIVED', "receivedDate" = NOW(), "updatedAt" = NOW() WHERE id = $1`,
+      `UPDATE purchase_orders SET status = 'RECEIVED', "updatedAt" = NOW() WHERE id = $1`,
       [orderId]
     );
 
@@ -130,9 +127,10 @@ export async function receivePurchaseOrderAction(
     revalidatePath("/inventory");
     revalidatePath("/dashboard");
     revalidatePath("/stock-movements");
-    return { success: `PO ${order.orderNumber} received — stock updated` };
+    return { success: `PO ${order.poNumber} received — stock updated` };
   } catch (e) {
-    console.error(e);
-    return { error: "Failed to receive order" };
+    console.error("receivePO:", e);
+    const msg = e instanceof Error ? e.message : "Failed to receive order";
+    return { error: msg };
   }
 }

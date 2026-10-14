@@ -17,22 +17,23 @@ export async function createSupplierAction(
   const email = (formData.get("email") as string)?.trim() || null;
   const phone = (formData.get("phone") as string)?.trim() || null;
   const address = (formData.get("address") as string)?.trim() || null;
-  const contactPerson = (formData.get("contactPerson") as string)?.trim() || null;
+  const contactName = (formData.get("contactPerson") as string)?.trim() || null;
 
   if (!name) return { error: "Supplier name is required" };
 
   try {
     const id = createId();
     await query(
-      `INSERT INTO suppliers (id, name, email, phone, address, "contactPerson", "isActive", "createdAt", "updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,true,NOW(),NOW())`,
-      [id, name, email, phone, address, contactPerson]
+      `INSERT INTO suppliers (id, name, "contactName", email, phone, address, "leadTimeDays", "isActive", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, 7, true, NOW(), NOW())`,
+      [id, name, contactName, email, phone, address]
     );
     revalidatePath("/suppliers");
     revalidatePath("/purchasing");
     return { success: "Supplier added" };
   } catch (e) {
-    console.error(e);
-    return { error: "Failed to add supplier" };
+    console.error("createSupplierAction:", e);
+    const msg = e instanceof Error ? e.message : "Failed to add supplier";
+    return { error: msg };
   }
 }

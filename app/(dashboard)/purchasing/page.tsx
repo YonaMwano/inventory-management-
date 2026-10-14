@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 type PORow = {
   id: string;
-  orderNumber: string;
+  poNumber: string;
   status: string;
   total: string;
   orderDate: Date;
@@ -19,7 +19,7 @@ type Option = { id: string; name: string; sku?: string; costPrice?: string };
 
 async function getPOs() {
   const r = await query<PORow>(`
-    SELECT po.id, po."orderNumber", po.status, po.total, po."orderDate", s.name as "supplierName"
+    SELECT po.id, po."poNumber", po.status, po.total, po."orderDate", s.name as "supplierName"
     FROM purchase_orders po
     JOIN suppliers s ON s.id = po."supplierId"
     ORDER BY po."orderDate" DESC LIMIT 50
@@ -81,14 +81,14 @@ export default async function PurchasingPage() {
             <tbody>
               {pos.map((po) => (
                 <tr key={po.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                  <td className="px-5 py-3 font-mono text-xs text-slate-600">{po.orderNumber}</td>
+                  <td className="px-5 py-3 font-mono text-xs text-slate-600">{po.poNumber}</td>
                   <td className="px-5 py-3 font-medium text-slate-900">{po.supplierName}</td>
                   <td className="px-5 py-3 text-xs text-slate-500">{formatDateTime(po.orderDate)}</td>
                   <td className="px-5 py-3 font-medium">{formatCurrency(Number(po.total))}</td>
                   <td className="px-5 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       po.status === "RECEIVED" ? "bg-green-100 text-green-800" :
-                      po.status === "ORDERED" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-700"
+                      po.status === "CONFIRMED" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-700"
                     }`}>{po.status}</span>
                   </td>
                   <td className="px-5 py-3">

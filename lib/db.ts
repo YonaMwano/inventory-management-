@@ -80,3 +80,4 @@ export type InventoryItem = {
   productSku?: string;
   reorderLevel?: number;
 };
+

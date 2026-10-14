@@ -1,7 +1,4 @@
-import { neon, neonConfig } from "@neondatabase/serverless";
-
-// Cache connections in Cloudflare Workers / edge
-neonConfig.fetchConnectionCache = true;
+import { neon } from "@neondatabase/serverless";
 
 function getSql() {
   const connectionString = process.env.DATABASE_URL;

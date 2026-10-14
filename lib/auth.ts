@@ -20,23 +20,24 @@ export async function hashPassword(password: string): Promise<string> {
   return `${salt}:${derived.toString("hex")}`;
 }
 
-export async function verifyPassword(
-  password: string,
-  stored: string
-): Promise<boolean> {
-  const [salt, key] = stored.split(":");
-  if (!salt || !key) return false;
-  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
-  const keyBuffer = Buffer.from(key, "hex");
-  if (keyBuffer.length !== derived.length) return false;
-  return timingSafeEqual(derived, keyBuffer);
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  try {
+    const [salt, key] = stored.split(":");
+    if (!salt || !key) return false;
+    const derived = (await scryptAsync(password, salt, 64)) as Buffer;
+    const keyBuffer = Buffer.from(key, "hex");
+    if (keyBuffer.length !== derived.length) return false;
+    return timingSafeEqual(derived, keyBuffer);
+  } catch {
+    return false;
+  }
 }
 
 export async function createSession(userId: string) {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, userId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     sameSite: "lax",
     maxAge: 60 * 60 * 24 * 7,
     path: "/",
@@ -44,24 +45,29 @@ export async function createSession(userId: string) {
 }
 
 export async function destroySession() {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE);
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete(SESSION_COOKIE);
+  } catch {
+    // ignore
+  }
 }
 
 export async function getSession(): Promise<SessionUser | null> {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!userId) return null;
-
   try {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get(SESSION_COOKIE)?.value;
+    if (!userId) return null;
+    if (!process.env.DATABASE_URL) return null;
     const result = await query<User>(
       `SELECT id, email, name, role FROM users WHERE id = $1 AND "isActive" = true`,
       [userId]
     );
-    if (result.rows.length === 0) return null;
+    if (!result.rows.length) return null;
     const u = result.rows[0];
     return { id: u.id, email: u.email, name: u.name, role: u.role };
-  } catch {
+  } catch (e) {
+    console.error("getSession error:", e);
     return null;
   }
 }
@@ -76,3 +82,4 @@ export function canAccess(role: Role, allowed: Role[]) {
   if (role === "ADMIN") return true;
   return allowed.includes(role);
 }
+

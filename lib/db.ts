@@ -1,41 +1,28 @@
-import { Pool, type QueryResultRow } from "pg";
+import { neon } from "@neondatabase/serverless";
 
-const globalForDb = globalThis as unknown as {
-  pool: Pool | undefined;
-};
-
-function createPool() {
+function getSql() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL is not set. Add it in .env.local (local) or Vercel Environment Variables."
+      "DATABASE_URL is not set. Add it in Netlify → Site settings → Environment variables."
     );
   }
-  return new Pool({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-    // Serverless-friendly settings for Vercel + Neon pooler
-    max: 5,
-    idleTimeoutMillis: 20000,
-    connectionTimeoutMillis: 10000,
-  });
+  return neon(connectionString);
 }
 
-export const pool = globalForDb.pool ?? createPool();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.pool = pool;
-}
-
-export async function query<T extends QueryResultRow = QueryResultRow>(
+export async function query<T = Record<string, unknown>>(
   text: string,
-  params?: unknown[]
+  params: unknown[] = []
 ) {
-  const result = await pool.query<T>(text, params);
-  return result;
+  const sql = getSql();
+  const result = await (sql as unknown as (
+    queryText: string,
+    params?: unknown[]
+  ) => Promise<T[]>)(text, params);
+  const rows = Array.isArray(result) ? result : [];
+  return { rows };
 }
 
-/** Generate a cuid-like id */
 export function createId() {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).slice(2, 10);

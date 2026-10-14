@@ -9,13 +9,13 @@ type SupplierRow = {
   name: string;
   email: string | null;
   phone: string | null;
-  contactPerson: string | null;
+  contactName: string | null;
   isActive: boolean;
 };
 
 async function getSuppliers() {
   const result = await query<SupplierRow>(`
-    SELECT id, name, email, phone, "contactPerson", "isActive"
+    SELECT id, name, email, phone, "contactName", "isActive"
     FROM suppliers ORDER BY name ASC
   `);
   return result.rows;
@@ -61,7 +61,7 @@ export default async function SuppliersPage() {
               {suppliers.map((s) => (
                 <tr key={s.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
                   <td className="px-5 py-3 font-medium text-slate-900">{s.name}</td>
-                  <td className="px-5 py-3 text-slate-600">{s.contactPerson || "—"}</td>
+                  <td className="px-5 py-3 text-slate-600">{s.contactName || "—"}</td>
                   <td className="px-5 py-3 text-slate-600">{s.email || "—"}</td>
                   <td className="px-5 py-3 text-slate-600">{s.phone || "—"}</td>
                   <td className="px-5 py-3">

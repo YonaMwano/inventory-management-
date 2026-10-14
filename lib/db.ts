@@ -4,38 +4,36 @@ const globalForDb = globalThis as unknown as {
   pool: Pool | undefined;
 };
 
-function createPool() {
+function getPool(): Pool {
+  if (globalForDb.pool) return globalForDb.pool;
+
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL is not set. Add it in .env.local (local) or Vercel Environment Variables."
+      "DATABASE_URL is not set. Add it in Cloudflare Pages → Settings → Environment variables (Production + Preview)."
     );
   }
-  return new Pool({
+
+  const pool = new Pool({
     connectionString,
     ssl: { rejectUnauthorized: false },
-    // Serverless-friendly settings for Vercel + Neon pooler
     max: 5,
     idleTimeoutMillis: 20000,
     connectionTimeoutMillis: 10000,
   });
-}
 
-export const pool = globalForDb.pool ?? createPool();
-
-if (process.env.NODE_ENV !== "production") {
   globalForDb.pool = pool;
+  return pool;
 }
 
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[]
 ) {
-  const result = await pool.query<T>(text, params);
+  const result = await getPool().query<T>(text, params);
   return result;
 }
 
-/** Generate a cuid-like id */
 export function createId() {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).slice(2, 10);

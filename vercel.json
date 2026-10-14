@@ -1,7 +1,0 @@
-{
-  "framework": "nextjs",
-  "regions": ["iad1"],
-  "env": {
-    "DATABASE_URL": "@database_url"
-  }
-}

@@ -1,6 +1,8 @@
 import { query } from "@/lib/db";
 import { formatCurrency, formatDateTime, getStockStatus } from "@/lib/utils";
 import {
+export const dynamic = "force-dynamic";
+
   Package,
   AlertTriangle,
   XCircle,
@@ -8,8 +10,6 @@ import {
   TrendingUp,
   Boxes,
 } from "@/components/icons";
-
-export const dynamic = "force-dynamic";
 
 type LowStockRow = {
   id: string;

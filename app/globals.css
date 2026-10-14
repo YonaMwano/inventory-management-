@@ -54,15 +54,15 @@ body {
   font-size: 14px;
 }
 
-.badge-in-stock { background-color: #dcfce7; color: #166534; }
-.badge-low-stock { background-color: #fef3c7; color: #92400e; }
-.badge-out-of-stock { background-color: #fee2e2; color: #991b1b; }
-.badge-draft { background-color: #f1f5f9; color: #334155; }
-.badge-confirmed { background-color: #dbeafe; color: #1e40af; }
-.badge-received { background-color: #dcfce7; color: #166534; }
-.badge-cancelled { background-color: #fee2e2; color: #991b1b; }
-.badge-paid { background-color: #dcfce7; color: #166534; }
-.badge-unpaid { background-color: #fef3c7; color: #92400e; }
+.badge-in-stock { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400; }
+.badge-low-stock { @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400; }
+.badge-out-of-stock { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400; }
+.badge-draft { @apply bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300; }
+.badge-confirmed { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400; }
+.badge-received { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400; }
+.badge-cancelled { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400; }
+.badge-paid { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400; }
+.badge-unpaid { @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400; }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

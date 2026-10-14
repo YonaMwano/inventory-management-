@@ -1,33 +1,41 @@
-import { neon } from "@neondatabase/serverless";
+import { Pool, type QueryResultRow } from "pg";
 
-function getSql() {
+const globalForDb = globalThis as unknown as {
+  pool: Pool | undefined;
+};
+
+function createPool() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL is not set. Add it in Cloudflare → Settings → Environment variables."
+      "DATABASE_URL is not set. Add it in .env.local (local) or Vercel Environment Variables."
     );
   }
-  return neon(connectionString);
+  return new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+    // Serverless-friendly settings for Vercel + Neon pooler
+    max: 5,
+    idleTimeoutMillis: 20000,
+    connectionTimeoutMillis: 10000,
+  });
 }
 
-/**
- * Parameterized SQL query. Returns { rows } for compatibility with existing code.
- * Placeholders: $1, $2, ...
- */
-export async function query<T = Record<string, unknown>>(
+export const pool = globalForDb.pool ?? createPool();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForDb.pool = pool;
+}
+
+export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
-  params: unknown[] = []
+  params?: unknown[]
 ) {
-  const sql = getSql();
-  // neon() callable form: sql(queryText, params) → rows array
-  const result = await (sql as unknown as (
-    queryText: string,
-    params?: unknown[]
-  ) => Promise<T[]>)(text, params);
-  const rows = Array.isArray(result) ? result : [];
-  return { rows };
+  const result = await pool.query<T>(text, params);
+  return result;
 }
 
+/** Generate a cuid-like id */
 export function createId() {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).slice(2, 10);

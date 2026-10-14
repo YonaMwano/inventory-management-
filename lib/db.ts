@@ -1,37 +1,34 @@
-import { Pool, type QueryResultRow } from "pg";
+import { neon, neonConfig } from "@neondatabase/serverless";
 
-const globalForDb = globalThis as unknown as {
-  pool: Pool | undefined;
-};
+// Cache connections in Cloudflare Workers / edge
+neonConfig.fetchConnectionCache = true;
 
-function getPool(): Pool {
-  if (globalForDb.pool) return globalForDb.pool;
-
+function getSql() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL is not set. Add it in Cloudflare Pages → Settings → Environment variables (Production + Preview)."
+      "DATABASE_URL is not set. Add it in Cloudflare → Settings → Environment variables."
     );
   }
-
-  const pool = new Pool({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-    max: 5,
-    idleTimeoutMillis: 20000,
-    connectionTimeoutMillis: 10000,
-  });
-
-  globalForDb.pool = pool;
-  return pool;
+  return neon(connectionString);
 }
 
-export async function query<T extends QueryResultRow = QueryResultRow>(
+/**
+ * Parameterized SQL query. Returns { rows } for compatibility with existing code.
+ * Placeholders: $1, $2, ...
+ */
+export async function query<T = Record<string, unknown>>(
   text: string,
-  params?: unknown[]
+  params: unknown[] = []
 ) {
-  const result = await getPool().query<T>(text, params);
-  return result;
+  const sql = getSql();
+  // neon() callable form: sql(queryText, params) → rows array
+  const result = await (sql as unknown as (
+    queryText: string,
+    params?: unknown[]
+  ) => Promise<T[]>)(text, params);
+  const rows = Array.isArray(result) ? result : [];
+  return { rows };
 }
 
 export function createId() {
